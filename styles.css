@@ -2,10 +2,36 @@ body {
     margin: 0;
     padding: 20px;
     background-color: rgb(2, 2, 2);
+    background-image: url('./images/logo.png');
+    background-position: center center;
+    background-repeat: no-repeat;
+    background-size: 180px;
     font-family: 'WF Visual Sans';
     src: url('https://dhygzobemt712.cloudfront.net/Fonts/VF/WFVisualSansVF.woff2') format('woff2');
     overflow: hidden;
     height: 100vh;
+}
+
+/* 标语样式 */
+#tagline {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, 70px);
+    color: #505050;
+    font-size: 14px;
+    text-align: center;
+    width: 100%;
+}
+
+/* 提示文字样式 */
+#tip-text {
+    position: fixed;
+    top: 32px;
+    left: 20px;
+    color: #505050;
+    font-size: 14px;
+    z-index: 9999;
 }
 
 .arrange-button {

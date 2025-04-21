@@ -2,15 +2,31 @@
 let highestZIndex = 1;
 // 全局变量，用于跟踪按钮状态（true表示卡片已整理，false表示卡片已打乱）
 let cardsArranged = false;
+// 每页显示的卡片数量
+const CARDS_PER_PAGE = 15;
+// 当前显示的卡片数据
+let currentDisplayCards = [];
+// 已显示过的卡片索引集合，用于避免重复显示
+let displayedCardIndices = new Set();
 
-// 创建整理/打乱按钮
+// 创建整理/打乱按钮和换一组按钮
 function createArrangeButton() {
-    const button = document.createElement('button');
-    button.id = 'arrange-button';
-    button.className = 'arrange-button';
-    button.textContent = '整理卡片';
-    button.addEventListener('click', toggleCardsArrangement);
-    document.body.appendChild(button);
+    // 整理/打乱按钮
+    const arrangeButton = document.createElement('button');
+    arrangeButton.id = 'arrange-button';
+    arrangeButton.className = 'arrange-button';
+    arrangeButton.textContent = '整理卡片';
+    arrangeButton.addEventListener('click', toggleCardsArrangement);
+    arrangeButton.style.right = '110px';
+    document.body.appendChild(arrangeButton);
+    
+    // 换一组按钮
+    const changeButton = document.createElement('button');
+    changeButton.id = 'change-button';
+    changeButton.className = 'arrange-button';
+    changeButton.textContent = '换一组';
+    changeButton.addEventListener('click', changeCards);
+    document.body.appendChild(changeButton);
 }
 
 // 切换卡片排列状态
@@ -365,8 +381,113 @@ function arrangeCards() {
     document.body.style.overflow = 'auto';
 }
 
-// 页面加载完成后直接创建卡片和整理按钮
-window.onload = function() {
-    createCards(cardData);
+// 从所有卡片中随机选择指定数量的卡片，避免重复显示
+// 创建轻提示函数
+function showToast(message, duration = 4000) {
+    // 检查是否已存在toast元素，如果有则移除
+    const existingToast = document.getElementById('toast-message');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // 创建toast元素
+    const toast = document.createElement('div');
+    toast.id = 'toast-message';
+    toast.className = 'toast-message';
+    toast.textContent = message;
+    
+    // 设置样式
+    toast.style.position = 'fixed';
+    toast.style.bottom = '80px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.backgroundColor = 'rgba(140, 140, 140, 0.15)';
+    toast.style.color = '#f0f0f0';
+    toast.style.padding = '10px 20px';
+    toast.style.borderRadius = '5px';
+    toast.style.zIndex = '10000';
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.5s ease';
+    toast.style.backdropFilter = 'blur(5px)';
+    toast.style.webkitBackdropFilter = 'blur(5px)';
+    toast.style.border = '1px solid rgba(140, 140, 140, 0.3)';
+    
+    // 添加到DOM
+    document.body.appendChild(toast);
+    
+    // 强制浏览器重新计算布局
+    void toast.offsetHeight;
+    
+    // 显示toast
+    toast.style.opacity = '1';
+    
+    // 设置定时器，自动隐藏toast
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+            toast.remove();
+        }, 800);
+    }, duration);
+}
+
+function getRandomCards(count) {
+    // 如果已显示的卡片数量接近总卡片数量，则重置显示记录
+    // 这确保在卡片总数不足时仍能正常工作
+    if (displayedCardIndices.size > cardData.length - count) {
+        console.log('重置已显示卡片记录');
+        displayedCardIndices.clear();
+        // 显示轻提示
+        showToast('所有图片已显示了一轮');
+    }
+    
+    // 创建可选卡片索引数组（排除已显示过的卡片）
+    const availableIndices = [];
+    for (let i = 0; i < cardData.length; i++) {
+        if (!displayedCardIndices.has(i)) {
+            availableIndices.push(i);
+        }
+    }
+    
+    // 打乱可选卡片索引
+    for (let i = availableIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availableIndices[i], availableIndices[j]] = [availableIndices[j], availableIndices[i]];
+    }
+    
+    // 选择指定数量的卡片索引
+    const selectedIndices = availableIndices.slice(0, count);
+    
+    // 将选中的索引添加到已显示集合中
+    selectedIndices.forEach(index => displayedCardIndices.add(index));
+    
+    // 返回选中的卡片数据
+    return selectedIndices.map(index => cardData[index]);
+}
+
+// 换一组卡片
+function changeCards() {
+    // 移除当前所有卡片
+    const cards = document.querySelectorAll('.card');
+    cards.forEach(card => card.remove());
+    
+    // 重置状态
+    cardsArranged = false;
+    document.getElementById('arrange-button').textContent = '整理卡片';
+    
+    // 获取新的随机卡片
+    currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    
+    // 创建新卡片
+    createCards(currentDisplayCards);
+}
+
+// 初始化函数
+function init() {
     createArrangeButton();
-};
+    // 初始化时只显示15张随机卡片
+    currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    createCards(currentDisplayCards);
+}
+
+// 页面加载完成后初始化
+window.onload = init;
