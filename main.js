@@ -110,6 +110,11 @@ function getRotationDegrees(element) {
     return 0;
 }
 
+// 检测是否为移动设备
+function isMobileDevice() {
+    return window.innerWidth <= 768;
+}
+
 // 创建卡片元素
 function createCards(data) {
     // 实现批次加载策略，每批次只显示少量卡片
@@ -121,7 +126,8 @@ function createCards(data) {
     // 预先创建所有卡片元素，但不立即添加到DOM
     const cardElements = data.map((data, index) => {
         const card = document.createElement('div');
-        card.className = 'card';
+        // 为第一个卡片添加特定类名
+        card.className = index === 0 ? 'card first-card' : 'card';
         
         // 随机旋转角度 (-18° 到 18°)
         const rotation = Math.random() * 36 - 18;
@@ -137,14 +143,24 @@ function createCards(data) {
         const initialWidth = data.imageWidth || 300;
         card.style.width = `${initialWidth}px`;
         
-        // 卡片内容
-        card.innerHTML = `
-            <div class="card-header">
-                <div class="card-title">${data.title}</div>
-                <div class="card-date">${data.date}</div>
-            </div>
-            <img class="card-image" src="${data.image}" alt="${data.title}" ${data.imageWidth ? `width="${data.imageWidth}"` : ''}>
-        `;
+        // 卡片内容 - PC端直接加载图片，移动端使用懒加载
+        if (isMobileDevice()) {
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-title">${data.title}</div>
+                    <div class="card-date">${data.date}</div>
+                </div>
+                <img class="card-image" data-src="${data.image}" alt="${data.title}" ${data.imageWidth ? `width="${data.imageWidth}"` : ''}>
+            `;
+        } else {
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-title">${data.title}</div>
+                    <div class="card-date">${data.date}</div>
+                </div>
+                <img class="card-image" src="${data.image}" alt="${data.title}" ${data.imageWidth ? `width="${data.imageWidth}"` : ''}>
+            `;
+        }
         
         // 初始时隐藏卡片并设置初始缩放比例
         card.style.opacity = '0';
@@ -176,7 +192,7 @@ function createCards(data) {
             const cardObj = cardElements[i];
             const card = cardObj.element;
             
-            // 获取图片元素并添加加载事件监听器
+            // 获取图片元素
             const cardImage = card.querySelector('.card-image');
             
             // 为每张卡片设置加载函数
@@ -187,8 +203,10 @@ function createCards(data) {
                 // 添加到DOM
                 document.body.appendChild(card);
                 
-                // 添加拖拽功能
-                makeDraggable(card);
+                // 在非移动设备上添加拖拽功能
+                if (!isMobileDevice()) {
+                    makeDraggable(card);
+                }
                 
                 // 为每张卡片添加随机延迟，错开显示时间
                 // 在同一批次内，卡片之间有更大的延迟差异
@@ -200,17 +218,35 @@ function createCards(data) {
                     card.style.transition = 'opacity 1s ease-out, visibility 1s ease-out, transform 1s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
                     card.style.opacity = '1';
                     card.style.visibility = 'visible';
-                    card.style.transform = `rotate(${card.dataset.rotation}deg) scale(1)`; // 从0.5缩放到1，产生更明显的放大效果
+                    
+                    // 移动设备上不旋转卡片
+                    if (!isMobileDevice()) {
+                        card.style.transform = `rotate(${card.dataset.rotation}deg) scale(1)`; // 从0.5缩放到1，产生更明显的放大效果
+                    } else {
+                        card.style.transform = 'scale(1)';
+                    }
+                    
                     console.log(`卡片 ${cardObj.index + 1} 已显示，批次: ${batchIndex + 1}，延迟: ${randomDelay}ms`);
+                    
+                    // 只在移动设备上实现图片懒加载
+                    if (isMobileDevice() && cardImage.getAttribute('data-src')) {
+                        cardImage.src = cardImage.getAttribute('data-src');
+                        cardImage.removeAttribute('data-src');
+                    }
                 }, randomDelay);
             };
             
-            // 监听图片加载完成事件
-            cardImage.onload = loadCard;
-            
-            // 如果图片已经缓存并加载完成，手动触发加载
-            if (cardImage.complete) {
+            // 如果是移动设备，直接加载卡片
+            if (isMobileDevice()) {
                 loadCard();
+            } else {
+                // 在非移动设备上，监听图片加载完成事件
+                cardImage.onload = loadCard;
+                
+                // 如果图片已经缓存并加载完成，手动触发加载
+                if (cardImage.complete) {
+                    loadCard();
+                }
             }
         }
         
@@ -437,7 +473,7 @@ function getRandomCards(count) {
         console.log('重置已显示卡片记录');
         displayedCardIndices.clear();
         // 显示轻提示
-        showToast('所有图片已显示了一轮');
+        showToast('所有图片都显示一轮了');
     }
     
     // 创建可选卡片索引数组（排除已显示过的卡片）
@@ -474,8 +510,12 @@ function changeCards() {
     cardsArranged = false;
     document.getElementById('arrange-button').textContent = '整理卡片';
     
-    // 获取新的随机卡片
-    currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    // 获取新的卡片数据，移动设备上显示所有图片，非移动设备显示随机15张
+    if (isMobileDevice()) {
+        currentDisplayCards = cardData;
+    } else {
+        currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    }
     
     // 创建新卡片
     createCards(currentDisplayCards);
@@ -483,10 +523,45 @@ function changeCards() {
 
 // 初始化函数
 function init() {
-    createArrangeButton();
-    // 初始化时只显示15张随机卡片
-    currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    // 只在非移动设备上创建按钮
+    if (!isMobileDevice()) {
+        createArrangeButton();
+        // 非移动设备上只显示15张随机卡片
+        currentDisplayCards = getRandomCards(CARDS_PER_PAGE);
+    } else {
+        // 移动设备上显示所有图片
+        currentDisplayCards = cardData;
+    }
     createCards(currentDisplayCards);
+    
+    // 只在移动设备上添加滚动监听以实现懒加载
+    if (isMobileDevice()) {
+        window.addEventListener('scroll', lazyLoadImages);
+    }
+}
+
+// 图片懒加载函数
+function lazyLoadImages() {
+    const lazyImages = document.querySelectorAll('img[data-src]');
+    
+    lazyImages.forEach(img => {
+        if (isElementInViewport(img)) {
+            img.src = img.getAttribute('data-src');
+            img.removeAttribute('data-src');
+        }
+    });
+}
+
+// 检查元素是否在视口中
+function isElementInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    
+    return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+    );
 }
 
 // 页面加载完成后初始化
